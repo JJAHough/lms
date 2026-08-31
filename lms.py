@@ -231,6 +231,7 @@ elif choice == "🎯 Setup & Log KPIs":
                         default_val = 0.0
                         if not existing_logs.empty and emp_id in existing_logs["Employee ID"].values:
                             # -- default_val = float(existing_logs[existing_logs["Employee ID"] == emp_id]["Value"].values) --
+                            matching_logs = existing_logs[existing_logs["Employee ID"] == emp_id]
                             default_val = float(matching_logs["Value"].iloc[0]) if not matching_logs.empty else 0.0
                         
                         val = st.number_input(f"Value for {emp_name} ({emp_id})", min_value=0.0, value=default_val, step=1.0)
