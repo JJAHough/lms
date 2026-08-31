@@ -365,7 +365,7 @@ elif choice == "📈 Weekly Dashboard":
 
     with c2:
         # -- st.subheader("Top Performers (KPI "print(chosen_dashboard_kpi)")") --
-        st.subheader(f"Top Performers - Avg. {chosen_dashboard_kpi}")
+        st.subheader(f"Top Performers - {chosen_dashboard_kpi}")
         if not filtered_kpi.empty:
             chart_data = filtered_kpi[filtered_kpi["KPI"] == chosen_dashboard_kpi]
             if not chart_data.empty:
