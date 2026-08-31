@@ -371,7 +371,7 @@ elif choice == "📈 Weekly Dashboard":
                 leaderboard = chart_data.groupby("Name")["Value"].mean().sort_values(ascending=False)
                 fig, ax = plt.subplots(figsize=(5, 4))
                 leaderboard.plot(kind='barh', color='#8884d8', ax=ax)
-                ax.set_xlabel("Cumulative Total")
+                ax.set_xlabel("Average")
                 st.pyplot(fig)
             else:
                 st.info(f"No logs found for '{chosen_dashboard_kpi}' in the chosen date range.")
