@@ -364,7 +364,7 @@ elif choice == "📈 Weekly Dashboard":
             st.info("No attendance data logged in this range.")
 
     with c2:
-        st.subheader("Top Performers (KPI Totals)")
+        st.subheader("Top Performers (KPI "print(chosen_dashboard_kpi)")")
         if not filtered_kpi.empty:
             chart_data = filtered_kpi[filtered_kpi["KPI"] == chosen_dashboard_kpi]
             if not chart_data.empty:
