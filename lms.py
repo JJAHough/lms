@@ -368,7 +368,7 @@ elif choice == "📈 Weekly Dashboard":
         if not filtered_kpi.empty:
             chart_data = filtered_kpi[filtered_kpi["KPI"] == chosen_dashboard_kpi]
             if not chart_data.empty:
-                leaderboard = chart_data.groupby("Name")["Value"].sum().sort_values(ascending=False)
+                leaderboard = chart_data.groupby("Name")["Value"].mean().sort_values(ascending=False)
                 fig, ax = plt.subplots(figsize=(5, 4))
                 leaderboard.plot(kind='barh', color='#8884d8', ax=ax)
                 ax.set_xlabel("Cumulative Total")
