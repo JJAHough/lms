@@ -379,11 +379,20 @@ elif choice == "📝 Daily Attendance":
                     cursor = conn.cursor()
 
                 for r in attendance_records:
-                    cursor.execute(f"""SELECT verification_photo_blob 
-                                       FROM attendance 
-                                       WHERE date='{date_str}'""")
-                    AND 
-                    employee_id='{r['employee_id']}'")res = cursor.fetchone()photo_to_save = res[0] 
+                    cursor.execute(f"""
+                        SELECT verification_photo_blob 
+                        FROM attendance 
+                        WHERE date='{date_str}'
+                    """)
+                    AND
+                    cursor.execute(f"""
+                        SELECT verification_photo_blob 
+                        FROM attendance 
+                        WHERE date='{date_str}' AND employee_id='{r["employee_id"]}'
+                    """)
+                    res = cursor.fetchone()
+                    photo_to_save = res[0]
+                    
                     if res and res[0] 
                 else None
 
