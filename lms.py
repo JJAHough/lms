@@ -394,8 +394,15 @@ elif choice == "📝 Daily Attendance":
                     photo_to_save = res[0]
                     
                     photo_to_save = res if (res and res[0]) else None
-
-                cursor.execute(f"DELETE FROM attendance WHERE date = '{date_str}' AND employee_id='{r['employee_id']}'")cursor.execute("INSERT INTO attendance VALUES (?, ?, ?, ?, ?, ?, ?)",(r["date"], r["employee_id"], r["name"], r["status"], r["ppe_compliant"], r["time_scanned"], photo_to_save))
+                    
+                # 1. Execute the delete operation on its own line
+                cursor.execute(f"DELETE FROM attendance WHERE date = '{date_str}' AND employee_id='{r['employee_id']}'")
+                
+                # 2. Execute the insert operation on a new line
+                cursor.execute(
+                    "INSERT INTO attendance VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (r["date"], r["employee_id"], r["name"], r["status"], r["ppe_compliant"], r["time_scanned"], photo_to_save)
+                )
 
                 # 1. Execute the delete operation
                 cursor.execute(
@@ -407,15 +414,15 @@ elif choice == "📝 Daily Attendance":
                     p_score = 100.0 if r["status"] == "Present" else 0.0
                     s_score = 100.0 if r["ppe_compliant"] == 1 else 0.0
                     
-                    # 3. Execute the database insertions sequentially
-                    cursor.execute(
-                        "INSERT INTO kpi_logs VALUES (?, ?, ?, 'Attendance Punctuality', ?)", 
-                        (date_str, r["employee_id"], r["name"], p_score)
-                    )
-                    cursor.execute(
-                        "INSERT INTO kpi_logs VALUES (?, ?, ?, 'Safety Compliance Score', ?)", 
-                        (date_str, r["employee_id"], r["name"], s_score)
-                    )
+                # 3. Execute the database insertions sequentially
+                cursor.execute(
+                    "INSERT INTO kpi_logs VALUES (?, ?, ?, 'Attendance Punctuality', ?)", 
+                    (date_str, r["employee_id"], r["name"], p_score)
+                )
+                cursor.execute(
+                    "INSERT INTO kpi_logs VALUES (?, ?, ?, 'Safety Compliance Score', ?)", 
+                    (date_str, r["employee_id"], r["name"], s_score)
+                )
                 conn.commit()
                 conn.close()
                 st.success("Manual changes saved successfully.")
