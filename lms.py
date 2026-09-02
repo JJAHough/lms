@@ -200,45 +200,60 @@ elif choice == "📝 Daily Attendance":
     if active_workers.empty:
         st.warning("No active employees found.")
     else:
-        # --- SUB-SECTION: LIVE CAMERA QR SCANNING WITH GREEN FLASH FEEDBACK ---
-        st.markdown("### 📷 Live Desk QR Check-In Scanner (Auto-Snapshot enabled)")
-        enable_scanner = st.checkbox("Turn On Webcam Scanner Window")
+        # --- SUB-SECTION: HANDS-FREE LIVE VIDEO QR SCANNER ---
+        st.markdown("### 📷 Live Desk QR Check-In Scanner (Fully Automated)")
+        enable_scanner = st.checkbox("Turn On Webcam Scanner Window", value=False)
         
         if enable_scanner:
-            img_file = st.camera_input("Hold worker QR badge clearly in front of camera lens:")
+            # Import the streaming utility component explicitly
+            from camera_input_live import camera_input_live
+            import cv2
+            import numpy as np
             
-            if img_file is not None:
+            # This streams frames sequentially into memory automatically without clicking buttons
+            live_frame = camera_input_live(debounce=200, key="live_automated_scanner")
+            
+            if live_frame is not None:
                 try:
-                    import cv2
-                    import numpy as np
-                    
-                    file_bytes = np.asarray(bytearray(img_file.read()), dtype=np.uint8)
+                    # Decrypt frame image bytes directly into an OpenCV matrix array
+                    file_bytes = np.asarray(bytearray(live_frame.read()), dtype=np.uint8)
                     opencv_img = cv2.imdecode(file_bytes, 1)
                     
                     detector = cv2.QRCodeDetector()
                     scanned_val, _, _ = detector.detectAndDecode(opencv_img)
                     
                     if scanned_val:
+                        # Verify the scanned value string matches a worker ID
                         match = active_workers[active_workers["Employee ID"] == scanned_val]
                         
                         if not match.empty:
                             matched_name = match["Name"].values[0]
                             
-                            # NEW: Inject a temporary green overlay container across the app layout
+                            # CRITICAL FIX: Inject aggressive fixed-viewport CSS to overwrite the entire screen container completely green
                             flash_placeholder = st.empty()
                             flash_placeholder.markdown("""
-                                <div style="fixed; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
-                                            background-color: rgba(40, 167, 69, 0.95); z-index: 99999; 
+                                <style>
+                                    /* Force hiding of normal Streamlit view wrapping app nodes entirely */
+                                    div[data-testid="stAppViewContainer"], 
+                                    header, 
+                                    .stSidebar {
+                                        opacity: 0.1 !important;
+                                    }
+                                </style>
+                                <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+                                            background-color: #28a745 !important; z-index: 9999999 !important; 
                                             display: flex; flex-direction: column; justify-content: center; align-items: center;
-                                            color: white; font-family: sans-serif; transition: all 0.5s ease;">
-                                    <h1 style="font-size: 80px; margin: 0;">🎯 VERIFIED PRESENT</h1>
-                                    <h2 style="font-size: 40px; margin-top: 10px;">""" + f"{matched_name} ({scanned_val})" + """</h2>
-                                    <p style="font-size: 20px; opacity: 0.8; margin-top: 5px;">Photo captured & logged into system rows successfully.</p>
+                                            color: white; font-family: 'Source Sans Pro', sans-serif;">
+                                    <span style="font-size: 140px; margin: 0;">✅</span>
+                                    <h1 style="font-size: 75px; font-weight: 800; margin: 10px 0 0 0; text-transform: uppercase; letter-spacing: 2px;">CHECK-IN VERIFIED</h1>
+                                    <h2 style="font-size: 45px; font-weight: 400; margin: 15px 0 0 0; background: rgba(0,0,0,0.2); padding: 10px 30px; border-radius: 50px;">""" + f"{matched_name} ({scanned_val})" + """</h2>
+                                    <p style="font-size: 22px; margin-top: 20px; opacity: 0.9;">Timestamp logged. Safe shift worker floor entry authorized.</p>
                                 </div>
                             """, unsafe_allow_html=True)
                             
-                            # Run core database commit processing queries behind the overlay screen
-                            raw_photo_bytes = img_file.getvalue()
+                            # Convert live frame buffer object directly into a DB binary blob format
+                            live_frame.seek(0)
+                            raw_photo_bytes = live_frame.read()
                             now_time = datetime.datetime.now().strftime("%H:%M:%S")
                             
                             conn = get_db_connection()
@@ -257,12 +272,12 @@ elif choice == "📝 Daily Attendance":
                             conn.commit()
                             conn.close()
                             
-                            # Let the green alert display for 1 second before clearing and reloading the page
-                            time.sleep(1.0)
+                            # Keep the full green interface frozen for 1.2 seconds for strong visibility impact
+                            time.sleep(1.2)
                             flash_placeholder.empty()
                             st.rerun()
                         else:
-                            st.error(f"Scanned data code '{scanned_val}' does not match any profile in your active system.")
+                            st.error(f"Scanned token value '{scanned_val}' has no verified account matching layout.")
                 except Exception as ex:
                     st.error(f"Scanner engine error occurred: {ex}")
 
@@ -324,8 +339,8 @@ elif choice == "📝 Daily Attendance":
                 
                 for r in attendance_records:
                     cursor.execute(f"SELECT verification_photo_blob FROM attendance WHERE date='{date_str}' AND employee_id='{r['employee_id']}'")
-                    existing_photo = cursor.fetchone()
-                    photo_to_save = existing_photo[0] if existing_photo and existing_photo[0] else None
+                    res = cursor.fetchone()
+                    photo_to_save = res[0] if res and res[0] else None
                     
                     cursor.execute(f"DELETE FROM attendance WHERE date = '{date_str}' AND employee_id='{r['employee_id']}'")
                     cursor.execute(
@@ -337,13 +352,15 @@ elif choice == "📝 Daily Attendance":
                     if r["status"] in ["Present", "Late"]:
                         p_score = 100.0 if r["status"] == "Present" else 0.0
                         s_score = 100.0 if r["ppe_compliant"] == 1 else 0.0
-                        cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, 'Attendance Punctuality', ?)", (date_str, r["employee_id"], r["name"], p_score))
-                        cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, 'Safety Compliance Score', ?)", (date_str, r["employee_id"], r["name"], s_score))
-                        
-                conn.commit()
-                conn.close()
-                st.success("Manual changes saved successfully.")
-                st.rerun()
+
+                    cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, 'Attendance Punctuality', ?)",
+                                   (date_str, r["employee_id"], r["name"], p_score))
+                    cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, 'Safety Compliance Score', ?)",
+                                   (date_str, r["employee_id"], r["name"], s_score))
+                    conn.commit()
+                    conn.close()
+                    st.success("Manual changes saved successfully.")
+                    st.rerun()
 
 # --------------------------------------------------------
 # 5. MODULE: SETUP & CAPTURE KPIS DAILY
