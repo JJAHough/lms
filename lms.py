@@ -4,6 +4,7 @@ import datetime
 import matplotlib.pyplot as plt
 import sqlite3
 import qrcode
+import time
 from io import BytesIO
 from PIL import Image
 
@@ -29,7 +30,7 @@ def init_db():
         )
     """)
     
-    # Create Table 2: Daily Attendance Logs (UPDATED with time_scanned)
+    # Create Table 2: Daily Attendance Logs
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS attendance (
             date TEXT,
@@ -37,7 +38,8 @@ def init_db():
             name TEXT,
             status TEXT,
             ppe_compliant INTEGER,
-            time_scanned TEXT
+            time_scanned TEXT,
+            verification_photo_blob BLOB
         )
     """)
     
@@ -60,7 +62,7 @@ def init_db():
         )
     """)
     
-    # Seed default data if completely empty
+    # Seed default baseline rows if database is completely new
     cursor.execute("SELECT COUNT(*) FROM employees")
     if cursor.fetchone() == 0:
         default_workers = [
@@ -68,7 +70,7 @@ def init_db():
             ("EMP002", "Jane Smith", "Picker/Packer", "Active"),
             ("EMP003", "Bob Johnson", "Sorter", "Active")
         ]
-        cursor.executemany("INSERT INTO employees VALUES (?, ?, ?, ?)", default_workers)
+        cursor.executemany("INSERT INTO employees VALUES (?, ?, ?, 'Active')", default_workers)
         
     cursor.execute("SELECT COUNT(*) FROM kpi_settings")
     if cursor.fetchone() == 0:
@@ -162,26 +164,22 @@ if choice == "👥 Employee Management":
             selected_id = selected_worker_str.split(" - ")[0]
             selected_name = selected_worker_str.split(" - ")[1]
             
-            # Create the QR Engine Matrix instance
             qr = qrcode.QRCode(version=1, box_size=10, border=4)
-            qr.add_data(selected_id)  # Embeds raw ID into image
+            qr.add_data(selected_id)
             qr.make(fit=True)
-            
             img = qr.make_image(fill_color="black", back_color="white")
             
-            # Format image string stream into downloadable byte arrays
             buf = BytesIO()
             img.save(buf, format="PNG")
             byte_im = buf.getvalue()
             
-            # UI display cards layout mapping side-by-side
-            col_card, col_badge_info = st.columns([1, 2])
+            col_card, col_badge_info = st.columns(2)
             with col_card:
                 st.image(byte_im, width=220, caption=f"Scan Card for ID: {selected_id}")
             with col_badge_info:
                 st.markdown(f"### **{selected_name}**")
                 st.write(f"**Staff Placement Reference:** {selected_id}")
-                st.write("Instruct employees to keep this code clearly visible on their ID card or mobile screen when presenting at the supervisor checking desk station.")
+                st.write("Instruct employees to present this badge at the checkpoint station monitor.")
                 st.download_button(
                     label=f"📥 Download {selected_id} QR Badge (PNG)",
                     data=byte_im,
@@ -193,7 +191,7 @@ if choice == "👥 Employee Management":
 # 4. MODULE: DAILY ATTENDANCE
 # --------------------------------------------------------
 elif choice == "📝 Daily Attendance":
-    st.header("Daily Attendance, QR Scan & Safety Check")
+    st.header("Daily Attendance & Instant Snapshot Verification")
     
     attendance_date = st.date_input("Select Date for Attendance", datetime.date.today())
     date_str = str(attendance_date)
@@ -202,63 +200,66 @@ elif choice == "📝 Daily Attendance":
     if active_workers.empty:
         st.warning("No active employees found.")
     else:
-        # Load existing database records for the chosen calendar day
-        conn = get_db_connection()
-        existing_att = pd.read_sql(f"SELECT * FROM attendance WHERE date = '{date_str}'", conn)
-        conn.close()
-        
-        # --- SUB-SECTION: LIVE CAMERA QR SCANNING HUB ---
-        st.markdown("### 📷 Live Desk QR Badge Check-In Scanner")
+        # --- SUB-SECTION: LIVE CAMERA QR SCANNING WITH GREEN FLASH FEEDBACK ---
+        st.markdown("### 📷 Live Desk QR Check-In Scanner (Auto-Snapshot enabled)")
         enable_scanner = st.checkbox("Turn On Webcam Scanner Window")
         
         if enable_scanner:
-            # Renders live system viewfinder streaming feed block framework safely
-            img_file = st.camera_input("Hold worker QR card in clear alignment view of lens:")
+            img_file = st.camera_input("Hold worker QR badge clearly in front of camera lens:")
             
             if img_file is not None:
                 try:
                     import cv2
                     import numpy as np
                     
-                    # Convert file bytes to OpenCV matrix framework structures
                     file_bytes = np.asarray(bytearray(img_file.read()), dtype=np.uint8)
                     opencv_img = cv2.imdecode(file_bytes, 1)
                     
-                    # Run OpenCV standard tracking QR Detector array logic
                     detector = cv2.QRCodeDetector()
                     scanned_val, _, _ = detector.detectAndDecode(opencv_img)
                     
                     if scanned_val:
-                        # Check if scanned value matches any active employee IDs
                         match = active_workers[active_workers["Employee ID"] == scanned_val]
                         
                         if not match.empty:
                             matched_name = match["Name"].values[0]
-                            st.success(f"🎯 **Scan Matched!** Employee: {matched_name} ({scanned_val}) verified.")
                             
-                            # Capture instant precision timestamp logging values
+                            # NEW: Inject a temporary green overlay container across the app layout
+                            flash_placeholder = st.empty()
+                            flash_placeholder.markdown("""
+                                <div style="fixed; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+                                            background-color: rgba(40, 167, 69, 0.95); z-index: 99999; 
+                                            display: flex; flex-direction: column; justify-content: center; align-items: center;
+                                            color: white; font-family: sans-serif; transition: all 0.5s ease;">
+                                    <h1 style="font-size: 80px; margin: 0;">🎯 VERIFIED PRESENT</h1>
+                                    <h2 style="font-size: 40px; margin-top: 10px;">""" + f"{matched_name} ({scanned_val})" + """</h2>
+                                    <p style="font-size: 20px; opacity: 0.8; margin-top: 5px;">Photo captured & logged into system rows successfully.</p>
+                                </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Run core database commit processing queries behind the overlay screen
+                            raw_photo_bytes = img_file.getvalue()
                             now_time = datetime.datetime.now().strftime("%H:%M:%S")
                             
-                            # Push a direct transactional SQL row edit safely into the database table
                             conn = get_db_connection()
                             cursor = conn.cursor()
                             
-                            # Clear old logs for this specific worker today to avoid duplication
                             cursor.execute(f"DELETE FROM attendance WHERE date='{date_str}' AND employee_id='{scanned_val}'")
-                            # Insert fresh authenticated scanned row block mapping status parameters
                             cursor.execute(
-                                "INSERT INTO attendance VALUES (?, ?, ?, 'Present', 1, ?)", 
-                                (date_str, scanned_val, matched_name, now_time)
+                                "INSERT INTO attendance VALUES (?, ?, ?, 'Present', 1, ?, ?)", 
+                                (date_str, scanned_val, matched_name, now_time, sqlite3.Binary(raw_photo_bytes))
                             )
                             
-                            # Auto-update accompanying Punctuality and Safety metrics tracking systems instantly
                             cursor.execute(f"DELETE FROM kpi_logs WHERE date='{date_str}' AND employee_id='{scanned_val}' AND kpi_name IN ('Attendance Punctuality', 'Safety Compliance Score')")
                             cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, 'Attendance Punctuality', 100.0)", (date_str, scanned_val, matched_name))
                             cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, 'Safety Compliance Score', 100.0)", (date_str, scanned_val, matched_name))
                             
                             conn.commit()
                             conn.close()
-                            st.info(f"Log filed automatically at {now_time} for reference. Refreshing ledger tables...")
+                            
+                            # Let the green alert display for 1 second before clearing and reloading the page
+                            time.sleep(1.0)
+                            flash_placeholder.empty()
                             st.rerun()
                         else:
                             st.error(f"Scanned data code '{scanned_val}' does not match any profile in your active system.")
@@ -269,8 +270,6 @@ elif choice == "📝 Daily Attendance":
         
         # --- SUB-SECTION: MANUAL OVERRIDE ROSTER FORM ---
         st.markdown("### 📋 Manual Override Ledger Sheets")
-        
-        # Reload fresh values to capture recent scanner changes instantly
         conn = get_db_connection()
         existing_att = pd.read_sql(f"SELECT * FROM attendance WHERE date = '{date_str}'", conn)
         conn.close()
@@ -282,7 +281,6 @@ elif choice == "📝 Daily Attendance":
                 emp_id = row["Employee ID"]
                 emp_name = row["Name"]
                 
-                # Assign baseline state matching parameters
                 default_status = "Present"
                 default_ppe = True
                 default_time = "Manual Log"
@@ -294,8 +292,13 @@ elif choice == "📝 Daily Attendance":
                     default_time = str(matching_row["time_scanned"].values[0])
                 
                 st.markdown(f"**{emp_name} ({emp_id})** — *{row['Role']}* | Checked: `{default_time}`")
-                col_status, col_ppe = st.columns(2)
                 
+                if not existing_att.empty and emp_id in existing_att["employee_id"].values:
+                    photo_val = existing_att[existing_att["employee_id"] == emp_id]["verification_photo_blob"].values[0]
+                    if photo_val:
+                        st.image(photo_val, width=120, caption="Audit verification snap")
+                
+                col_status, col_ppe = st.columns(2)
                 with col_status:
                     status = st.radio(
                         f"Status for {emp_id}", ["Present", "Absent", "Sick Leave", "Late"], 
@@ -319,12 +322,17 @@ elif choice == "📝 Daily Attendance":
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 
-                # Clean slate rewrite for the selected date target parameters block
-                cursor.execute(f"DELETE FROM attendance WHERE date = '{date_str}'")
                 for r in attendance_records:
-                    cursor.execute("INSERT INTO attendance VALUES (?, ?, ?, ?, ?, ?)", (r["date"], r["employee_id"], r["name"], r["status"], r["ppe_compliant"], r["time_scanned"]))
+                    cursor.execute(f"SELECT verification_photo_blob FROM attendance WHERE date='{date_str}' AND employee_id='{r['employee_id']}'")
+                    existing_photo = cursor.fetchone()
+                    photo_to_save = existing_photo[0] if existing_photo and existing_photo[0] else None
                     
-                    # Handle syncing secondary operational metric dependencies values
+                    cursor.execute(f"DELETE FROM attendance WHERE date = '{date_str}' AND employee_id='{r['employee_id']}'")
+                    cursor.execute(
+                        "INSERT INTO attendance VALUES (?, ?, ?, ?, ?, ?, ?)", 
+                        (r["date"], r["employee_id"], r["name"], r["status"], r["ppe_compliant"], r["time_scanned"], photo_to_save)
+                    )
+                    
                     cursor.execute(f"DELETE FROM kpi_logs WHERE date='{date_str}' AND employee_id='{r['employee_id']}' AND kpi_name IN ('Attendance Punctuality', 'Safety Compliance Score')")
                     if r["status"] in ["Present", "Late"]:
                         p_score = 100.0 if r["status"] == "Present" else 0.0
@@ -334,7 +342,7 @@ elif choice == "📝 Daily Attendance":
                         
                 conn.commit()
                 conn.close()
-                st.success("Manual overrides stored safely into persistent system database rows.")
+                st.success("Manual changes saved successfully.")
                 st.rerun()
 
 # --------------------------------------------------------
@@ -408,7 +416,7 @@ elif choice == "🎯 Setup & Log KPIs":
                         
                         default_val = 0.0
                         if not existing_logs.empty and emp_id in existing_logs["employee_id"].values:
-                            default_val = float(existing_logs[existing_logs["employee_id"] == emp_id]["value"].values[0])
+                            default_val = float(existing_logs[existing_logs["employee_id"] == emp_id]["value"].values)
                         
                         val = st.number_input(f"Value for {emp_name} ({emp_id})", min_value=0.0, value=default_val, step=1.0)
                         kpi_records.append({"date": date_str, "employee_id": emp_id, "name": emp_name, "kpi_name": selected_kpi, "value": val})
@@ -444,11 +452,9 @@ elif choice == "📈 Weekly Dashboard":
     kpi_options = list(settings_df["kpi_name"].values) if not settings_df.empty else ["Boxes Packed"]
     chosen_dashboard_kpi = st.selectbox("📊 Select KPI for Card & Chart Filtering", kpi_options, index=0)
     
-    # Retrieve structural target matching threshold configurations
     target_row = settings_df[settings_df["kpi_name"] == chosen_dashboard_kpi] if not settings_df.empty else pd.DataFrame()
-    weekly_target_threshold = float(target_row["target_value"].values[0]) if not target_row.empty else 50.0
+    weekly_target_threshold = float(target_row["target_value"].values) if not target_row.empty else 50.0
     
-    # Apply date filters safely over the database frames data strings mapping
     start_str, today_str = str(start_week), str(today)
     
     if not attendance_all.empty:
@@ -461,7 +467,6 @@ elif choice == "📈 Weekly Dashboard":
     else:
         filtered_kpi = pd.DataFrame()
 
-    # Process weekly perfect-performance indicators
     bonus_workers = []
     if not filtered_att.empty:
         for emp_id in filtered_att["employee_id"].unique():
@@ -533,7 +538,7 @@ elif choice == "📈 Weekly Dashboard":
         else:
             st.info("No logs present for this date range scope.")
     with c2:
-        st.subheader("Top Performers (KPI Totals)")
+        st.subheader(f"Top Performers - {chosen_dashboard_kpi}")
         if not filtered_kpi.empty:
             chart_data = filtered_kpi[filtered_kpi["kpi_name"] == chosen_dashboard_kpi]
             if not chart_data.empty:
@@ -553,9 +558,12 @@ elif choice == "📈 Weekly Dashboard":
     st.subheader("Raw Activity Logs & Data Export")
     t1, t2 = st.tabs(["Attendance & Scan Timestamps Records", "KPI Tracking Records"])
     with t1:
-        st.dataframe(filtered_att, use_container_width=True)
         if not filtered_att.empty:
-            st.download_button("📥 Download Attendance & Timestamps CSV", filtered_att.to_csv(index=False).encode('utf-8'), f"attendance_and_time_logs_{start_week}_to_{today}.csv", "text/csv")
+            display_att_df = filtered_att.drop(columns=["verification_photo_blob"], errors="ignore")
+            st.dataframe(display_att_df, use_container_width=True)
+            st.download_button("📥 Download Attendance & Timestamps CSV", display_att_df.to_csv(index=False).encode('utf-8'), f"attendance_and_time_logs_{start_week}_to_{today}.csv", "text/csv")
+        else:
+            st.dataframe(filtered_att)
     with t2:
         st.dataframe(filtered_kpi, use_container_width=True)
         if not filtered_kpi.empty:
