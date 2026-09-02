@@ -1,5 +1,3 @@
 streamlit
 matplotlib
-qrcode pillow
-opencv-python-headless
-streamlit-camera-input-live
+qrcode pillow opencv-python-headless streamlit-camera-input-live
