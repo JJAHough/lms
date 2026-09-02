@@ -374,7 +374,9 @@ elif choice == "📝 Daily Attendance":
 
                 save_attendance = st.form_submit_button("Save Attendance Ledger Overrides")
 
-                if save_attendance:conn = get_db_connection()cursor = conn.cursor()
+                if save_attendance:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
 
                 for r in attendance_records:
                     cursor.execute(f"SELECT verification_photo_blob FROM attendance WHERE date='{date_str}' 
