@@ -393,8 +393,7 @@ elif choice == "📝 Daily Attendance":
                     res = cursor.fetchone()
                     photo_to_save = res[0]
                     
-                    if res and res[0] 
-                else None
+                    if res and res[0]: else None
 
                 cursor.execute(f"DELETE FROM attendance WHERE date = '{date_str}' AND employee_id='{r['employee_id']}'")cursor.execute("INSERT INTO attendance VALUES (?, ?, ?, ?, ?, ?, ?)",(r["date"], r["employee_id"], r["name"], r["status"], r["ppe_compliant"], r["time_scanned"], photo_to_save))
 
