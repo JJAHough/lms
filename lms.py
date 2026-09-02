@@ -376,9 +376,14 @@ elif choice == "📝 Daily Attendance":
 
                 if save_attendance:
                     conn = get_db_connection()
+                    
                     cursor = conn.cursor()
 
                 for r in attendance_records:
+                    conn = get_db_connection()
+                    
+                    cursor = conn.cursor()
+                    
                     cursor.execute(f"""
                         SELECT verification_photo_blob 
                         FROM attendance 
