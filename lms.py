@@ -398,8 +398,25 @@ elif choice == "📝 Daily Attendance":
 
                 cursor.execute(f"DELETE FROM attendance WHERE date = '{date_str}' AND employee_id='{r['employee_id']}'")cursor.execute("INSERT INTO attendance VALUES (?, ?, ?, ?, ?, ?, ?)",(r["date"], r["employee_id"], r["name"], r["status"], r["ppe_compliant"], r["time_scanned"], photo_to_save))
 
-                cursor.execute(f"DELETE FROM kpi_logs WHERE date='{date_str}' AND employee_id='{r['employee_id']}' AND kpi_name IN ('Attendance Punctuality', 'Safety Compliance Score')")if r["status"] in ["Present", "Late"]:p_score = 100.0 if r["status"] == "Present" else 0.0s_score = 100.0 if r["ppe_compliant"] == 1 else 0.0cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, 'Attendance Punctuality', ?)", (date_str, r["employee_id"], r["name"], p_score))cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, 'Safety Compliance Score', ?)", (date_str, r["employee_id"], r["name"], s_score))
-
+                # 1. Execute the delete operation
+                cursor.execute(
+                    f"DELETE FROM kpi_logs WHERE date='{date_str}' AND employee_id='{r['employee_id']}' AND kpi_name IN ('Attendance Punctuality', 'Safety Compliance Score')"
+                )
+                
+                # 2. Check status conditions and set variables on separate lines
+                if r["status"] in ["Present", "Late"]:
+                    p_score = 100.0 if r["status"] == "Present" else 0.0
+                    s_score = 100.0 if r["ppe_compliant"] == 1 else 0.0
+                    
+                    # 3. Execute the database insertions sequentially
+                    cursor.execute(
+                        "INSERT INTO kpi_logs VALUES (?, ?, ?, 'Attendance Punctuality', ?)", 
+                        (date_str, r["employee_id"], r["name"], p_score)
+                    )
+                    cursor.execute(
+                        "INSERT INTO kpi_logs VALUES (?, ?, ?, 'Safety Compliance Score', ?)", 
+                        (date_str, r["employee_id"], r["name"], s_score)
+                    )
                 conn.commit()
                 conn.close()
                 st.success("Manual changes saved successfully.")
