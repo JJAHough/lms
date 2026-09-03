@@ -350,7 +350,14 @@ elif choice == "📝 Daily Attendance":
                 if not existing_att.empty and emp_id in existing_att["employee_id"].values:
                     photo_val = existing_att[existing_att["employee_id"] == emp_id]["verification_photo_blob"].values
                     
-                if isinstance(photo_val, (list, tuple)) and photo_val and photo_val[0] is not None:
+                try:
+                    # Use direct indexing if it's iterable, wrapped safely
+                    has_photo = hasattr(photo_val, '__getitem__') and len(photo_val) > 0 and photo_val[0] is not None
+                except Exception:
+                    has_photo = False
+                
+                if has_photo:
+                    # Your logic here
                     st.image(photo_val[0], width=120, caption="Audit verification snap")
 
                 col_status, col_ppe = st.columns(2)
