@@ -349,8 +349,8 @@ elif choice == "📝 Daily Attendance":
                 
                 if not existing_att.empty and emp_id in existing_att["employee_id"].values:
                     photo_val = existing_att[existing_att["employee_id"] == emp_id]["verification_photo_blob"].values
-
-                if photo_val and len(photo_val) > 0 and photo_val[0] is not None:
+                    
+                if photo_val is not None and len(photo_val) > 0 and photo_val[0] is not None:
                     st.image(photo_val[0], width=120, caption="Audit verification snap")
 
                 col_status, col_ppe = st.columns(2)
