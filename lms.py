@@ -542,7 +542,7 @@ elif choice == "📈 Weekly Dashboard":
     chosen_dashboard_kpi = st.selectbox("📊 Select KPI for Card & Chart Filtering", kpi_options, index=0)
     
     target_row = settings_df[settings_df["kpi_name"] == chosen_dashboard_kpi] if not settings_df.empty else pd.DataFrame()
-    weekly_target_threshold = float(target_row["target_value"].values) if not target_row.empty else 50.0
+    weekly_target_threshold = float(target_row["target_value"].values[0]) if not target_row.empty else 50.0
     
     start_str, today_str = str(start_week), str(today)
     
