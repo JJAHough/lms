@@ -200,30 +200,19 @@ elif choice == "📝 Daily Attendance":
     if active_workers.empty:
         st.warning("No active employees found.")
     else:
-        # --- SUB-SECTION: AUTOMATED SCANNERS ---
-        st.markdown("### 📷 Live Desk QR Check-In Scanner")
+        # --- SUB-SECTION: LIVE CAMERA QR SCANNING WITH GREEN FLASH FEEDBACK ---
+        st.markdown("### 📷 Live Desk QR Check-In Scanner (Auto-Snapshot enabled)")
+        enable_scanner = st.checkbox("Turn On Webcam Scanner Window")
         
-        # Give supervisors an explicit tool mode selection toggle to bypass hardware blocks
-        scanner_mode = st.radio(
-            "Select Scanner Control System Type:",
-            ["🔴 Scanner Off", "⚡ Fully Automated Live Scanner", "📸 Standard Manual Snapshot Scanner"],
-            horizontal=True
-        )
-        
-        # OPTION 1: TRUE LIVE HANDS-FREE AUTOMATIC SCANNING
-        if scanner_mode == "⚡ Fully Automated Live Scanner":
-            try:
-                from camera_input_live import camera_input_live
-                import cv2
-                import numpy as np
-                
-                st.info("Searching for local webcam stream... Please accept browser permissions prompt if visible.")
-                
-                # Render the live background streaming component
-                live_frame = camera_input_live(debounce=200, key="live_automated_scanner")
-                
-                if live_frame is not None:
-                    file_bytes = np.asarray(bytearray(live_frame.read()), dtype=np.uint8)
+        if enable_scanner:
+            img_file = st.camera_input("Hold worker QR badge clearly in front of camera lens:")
+            
+            if img_file is not None:
+                try:
+                    import cv2
+                    import numpy as np
+                    
+                    file_bytes = np.asarray(bytearray(img_file.read()), dtype=np.uint8)
                     opencv_img = cv2.imdecode(file_bytes, 1)
                     
                     detector = cv2.QRCodeDetector()
@@ -233,36 +222,34 @@ elif choice == "📝 Daily Attendance":
                         match = active_workers[active_workers["Employee ID"] == scanned_val]
                         
                         if not match.empty:
-                            matched_name = match["Name"].values
+                            matched_name = match["Name"].values[0]
                             
-                            # FULL-SCREEN GREEN FLASH: Injects global fixed viewport layout styles immediately
+                            # NEW: Inject a temporary green overlay container across the app layout
                             flash_placeholder = st.empty()
                             flash_placeholder.markdown("""
-                                <style>
-                                    div[data-testid="stAppViewContainer"], header, .stSidebar { opacity: 0.1 !important; }
-                                </style>
-                                <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
-                                            background-color: #28a745 !important; z-index: 9999999 !important; 
+                                <div style="fixed; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+                                            background-color: rgba(40, 167, 69, 0.95); z-index: 99999; 
                                             display: flex; flex-direction: column; justify-content: center; align-items: center;
-                                            color: white; font-family: sans-serif;">
-                                    <span style="font-size: 140px; margin: 0;">✅</span>
-                                    <h1 style="font-size: 75px; font-weight: 800; margin: 10px 0 0 0; text-transform: uppercase;">CHECK-IN VERIFIED</h1>
-                                    <h2 style="font-size: 45px; font-weight: 400; margin: 15px 0 0 0; background: rgba(0,0,0,0.2); padding: 10px 30px; border-radius: 50px;">""" + f"{matched_name} ({scanned_val})" + """</h2>
-                                    <p style="font-size: 22px; margin-top: 20px; opacity: 0.9;">Timestamp logged into database rows successfully.</p>
+                                            color: white; font-family: sans-serif; transition: all 0.5s ease;">
+                                    <h1 style="font-size: 80px; margin: 0;">🎯 VERIFIED PRESENT</h1>
+                                    <h2 style="font-size: 40px; margin-top: 10px;">""" + f"{matched_name} ({scanned_val})" + """</h2>
+                                    <p style="font-size: 20px; opacity: 0.8; margin-top: 5px;">Photo captured & logged into system rows successfully.</p>
                                 </div>
                             """, unsafe_allow_html=True)
                             
-                            live_frame.seek(0)
-                            raw_photo_bytes = live_frame.read()
+                            # Run core database commit processing queries behind the overlay screen
+                            raw_photo_bytes = img_file.getvalue()
                             now_time = datetime.datetime.now().strftime("%H:%M:%S")
                             
                             conn = get_db_connection()
                             cursor = conn.cursor()
+                            
                             cursor.execute(f"DELETE FROM attendance WHERE date='{date_str}' AND employee_id='{scanned_val}'")
                             cursor.execute(
                                 "INSERT INTO attendance VALUES (?, ?, ?, 'Present', 1, ?, ?)", 
                                 (date_str, scanned_val, matched_name, now_time, sqlite3.Binary(raw_photo_bytes))
                             )
+                            
                             cursor.execute(f"DELETE FROM kpi_logs WHERE date='{date_str}' AND employee_id='{scanned_val}' AND kpi_name IN ('Attendance Punctuality', 'Safety Compliance Score')")
                             cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, 'Attendance Punctuality', 100.0)", (date_str, scanned_val, matched_name))
                             cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, 'Safety Compliance Score', 100.0)", (date_str, scanned_val, matched_name))
@@ -270,55 +257,14 @@ elif choice == "📝 Daily Attendance":
                             conn.commit()
                             conn.close()
                             
-                            time.sleep(1.2)
+                            # Let the green alert display for 1 second before clearing and reloading the page
+                            time.sleep(1.0)
                             flash_placeholder.empty()
                             st.rerun()
-            except ModuleNotFoundError:
-                st.error("Missing dependency! Please open your terminal and run: pip install streamlit-camera-input-live")
-            except Exception as e:
-                st.error(f"Live engine failed to mount video container: {e}. Try swapping to 'Standard Manual Snapshot' mode below.")
-
-        # OPTION 2: RELIABLE STANDARD CAMERA FALLBACK
-        elif scanner_mode == "📸 Standard Manual Snapshot Scanner":
-            st.info("Using native system browser drivers. Position your card and click 'Take Photo'.")
-            img_file = st.camera_input("Roster validation lens:", key="standard_fallback_widget")
-            
-            if img_file is not None:
-                import cv2
-                import numpy as np
-                file_bytes = np.asarray(bytearray(img_file.read()), dtype=np.uint8)
-                opencv_img = cv2.imdecode(file_bytes, 1)
-                detector = cv2.QRCodeDetector()
-                scanned_val, _, _ = detector.detectAndDecode(opencv_img)
-                
-                if scanned_val:
-                    match = active_workers[active_workers["Employee ID"] == scanned_val]
-                    if not match.empty:
-                        matched_name = match["Name"].values
-                        
-                        # Injects green flash overlay
-                        st.markdown("""
-                            <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #28a745; z-index: 99999; display: flex; justify-content: center; align-items: center; color: white;">
-                                <h1 style="font-size: 60px;">✅ SUCCESS: """ + f"{matched_name}" + """</h1>
-                            </div>
-                        """, unsafe_allow_html=True)
-                        
-                        raw_photo_bytes = img_file.getvalue()
-                        now_time = datetime.datetime.now().strftime("%H:%M:%S")
-                        
-                        conn = get_db_connection()
-                        cursor = conn.cursor()
-                        cursor.execute(f"DELETE FROM attendance WHERE date='{date_str}' AND employee_id='{scanned_val}'")
-                        cursor.execute("INSERT INTO attendance VALUES (?, ?, ?, 'Present', 1, ?, ?)", (date_str, scanned_val, matched_name, now_time, sqlite3.Binary(raw_photo_bytes)))
-                        cursor.execute(f"DELETE FROM kpi_logs WHERE date='{date_str}' AND employee_id='{scanned_val}' AND kpi_name IN ('Attendance Punctuality', 'Safety Compliance Score')")
-                        cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, 'Attendance Punctuality', 100.0)", (date_str, scanned_val, matched_name))
-                        cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, 'Safety Compliance Score', 100.0)", (date_str, scanned_val, matched_name))
-                        conn.commit()
-                        conn.close()
-                        time.sleep(1.0)
-                        st.rerun()
-                else:
-                    st.error("No clear QR Matrix code visible in the snapped picture. Please adjust lighting angles and try again.")
+                        else:
+                            st.error(f"Scanned data code '{scanned_val}' does not match any profile in your active system.")
+                except Exception as ex:
+                    st.error(f"Scanner engine error occurred: {ex}")
 
         st.markdown("---")
         
@@ -341,94 +287,59 @@ elif choice == "📝 Daily Attendance":
                 
                 if not existing_att.empty and emp_id in existing_att["employee_id"].values:
                     matching_row = existing_att[existing_att["employee_id"] == emp_id]
-                    default_status = matching_row["status"].values
-                    default_ppe = bool(matching_row["ppe_compliant"].values)
-                    default_time = str(matching_row["time_scanned"].values)
+                    default_status = matching_row["status"].values[0]
+                    default_ppe = bool(matching_row["ppe_compliant"].values[0])
+                    default_time = str(matching_row["time_scanned"].values[0])
                 
                 st.markdown(f"**{emp_name} ({emp_id})** — *{row['Role']}* | Checked: `{default_time}`")
                 
                 if not existing_att.empty and emp_id in existing_att["employee_id"].values:
-                    photo_val = existing_att[existing_att["employee_id"] == emp_id]["verification_photo_blob"].values
-                    
-                try:
-                    # Use direct indexing if it's iterable, wrapped safely
-                    has_photo = hasattr(photo_val, '__getitem__') and len(photo_val) > 0 and photo_val[0] is not None
-                except Exception:
-                    has_photo = False
+                    photo_val = existing_att[existing_att["employee_id"] == emp_id]["verification_photo_blob"].values[0]
+                    if photo_val:
+                        st.image(photo_val, width=120, caption="Audit verification snap")
                 
-                if has_photo:
-                    # Your logic here
-                    st.image(photo_val[0], width=120, caption="Audit verification snap")
-
                 col_status, col_ppe = st.columns(2)
                 with col_status:
                     status = st.radio(
-                        f"Status for {emp_id}", ["Present", "Absent", "Sick Leave", "Late"],
-                        index=["Present", "Absent", "Sick Leave", 
-                               "Late"].index(default_status),
-                        horizontal=True, label_visibility="collapsed")
-                
+                        f"Status for {emp_id}", ["Present", "Absent", "Sick Leave", "Late"], 
+                        index=["Present", "Absent", "Sick Leave", "Late"].index(default_status), 
+                        horizontal=True, label_visibility="collapsed"
+                    )
                 with col_ppe:
                     ppe_ok = st.checkbox("✅ PPE Compliant", value=default_ppe, key=f"ppe_{emp_id}_{idx}")
-                    
-                    final_ppe = ppe_ok if status in ["Present", "Late"] else False
-                    
+                
+                final_ppe = ppe_ok if status in ["Present", "Late"] else False
+                
                 attendance_records.append({
-                    "date": date_str, "employee_id": emp_id, "name": emp_name,"status": status, "ppe_compliant": 1 if final_ppe else 0, "time_scanned": default_time
+                    "date": date_str, "employee_id": emp_id, "name": emp_name, 
+                    "status": status, "ppe_compliant": 1 if final_ppe else 0, "time_scanned": default_time
                 })
-
                 st.markdown("---")
-
-                save_attendance = st.form_submit_button("Save Attendance Ledger Overrides")
-
-                if save_attendance:
-                    conn = get_db_connection()
-                    
-                    cursor = conn.cursor()
-
+            
+            save_attendance = st.form_submit_button("Save Attendance Ledger Overrides")
+            
+            if save_attendance:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
                 for r in attendance_records:
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
+                    cursor.execute(f"SELECT verification_photo_blob FROM attendance WHERE date='{date_str}' AND employee_id='{r['employee_id']}'")
+                    existing_photo = cursor.fetchone()
+                    photo_to_save = existing_photo[0] if existing_photo and existing_photo[0] else None
                     
-                    # Combined into a single, targeted query
-                    cursor.execute(f"""
-                        SELECT verification_photo_blob 
-                        FROM attendance 
-                        WHERE date='{date_str}' AND employee_id='{r["employee_id"]}'
-                    """)
-                    res = cursor.fetchone()
+                    cursor.execute(f"DELETE FROM attendance WHERE date = '{date_str}' AND employee_id='{r['employee_id']}'")
+                    cursor.execute(
+                        "INSERT INTO attendance VALUES (?, ?, ?, ?, ?, ?, ?)", 
+                        (r["date"], r["employee_id"], r["name"], r["status"], r["ppe_compliant"], r["time_scanned"], photo_to_save)
+                    )
                     
-                    # Safely extract the blob if a row was found
-                    photo_to_save = res[0] if (res and res[0] is not None) else None
-                    
-                # 1. Execute the delete operation on its own line
-                cursor.execute(f"DELETE FROM attendance WHERE date = '{date_str}' AND employee_id='{r['employee_id']}'")
-                
-                # 2. Execute the insert operation on a new line
-                cursor.execute(
-                    "INSERT INTO attendance VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (r["date"], r["employee_id"], r["name"], r["status"], r["ppe_compliant"], r["time_scanned"], photo_to_save)
-                )
-
-                # 1. Execute the delete operation
-                cursor.execute(
-                    f"DELETE FROM kpi_logs WHERE date='{date_str}' AND employee_id='{r['employee_id']}' AND kpi_name IN ('Attendance Punctuality', 'Safety Compliance Score')"
-                )
-                
-                # 2. Check status conditions and set variables on separate lines
-                if r["status"] in ["Present", "Late"]:
-                    p_score = 100.0 if r["status"] == "Present" else 0.0
-                    s_score = 100.0 if r["ppe_compliant"] == 1 else 0.0
-                    
-                # 3. Execute the database insertions sequentially
-                cursor.execute(
-                    "INSERT INTO kpi_logs VALUES (?, ?, ?, 'Attendance Punctuality', ?)", 
-                    (date_str, r["employee_id"], r["name"], p_score)
-                )
-                cursor.execute(
-                    "INSERT INTO kpi_logs VALUES (?, ?, ?, 'Safety Compliance Score', ?)", 
-                    (date_str, r["employee_id"], r["name"], s_score)
-                )
+                    cursor.execute(f"DELETE FROM kpi_logs WHERE date='{date_str}' AND employee_id='{r['employee_id']}' AND kpi_name IN ('Attendance Punctuality', 'Safety Compliance Score')")
+                    if r["status"] in ["Present", "Late"]:
+                        p_score = 100.0 if r["status"] == "Present" else 0.0
+                        s_score = 100.0 if r["ppe_compliant"] == 1 else 0.0
+                        cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, 'Attendance Punctuality', ?)", (date_str, r["employee_id"], r["name"], p_score))
+                        cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, 'Safety Compliance Score', ?)", (date_str, r["employee_id"], r["name"], s_score))
+                        
                 conn.commit()
                 conn.close()
                 st.success("Manual changes saved successfully.")
@@ -543,7 +454,7 @@ elif choice == "📈 Weekly Dashboard":
     chosen_dashboard_kpi = st.selectbox("📊 Select KPI for Card & Chart Filtering", kpi_options, index=0)
     
     target_row = settings_df[settings_df["kpi_name"] == chosen_dashboard_kpi] if not settings_df.empty else pd.DataFrame()
-    weekly_target_threshold = float(target_row["target_value"].values[0]) if not target_row.empty else 50.0
+    weekly_target_threshold = float(target_row["target_value"].values) if not target_row.empty else 50.0
     
     start_str, today_str = str(start_week), str(today)
     
@@ -628,7 +539,7 @@ elif choice == "📈 Weekly Dashboard":
         else:
             st.info("No logs present for this date range scope.")
     with c2:
-        st.subheader(f"Top Performers - {chosen_dashboard_kpi}")
+        st.subheader("Top Performers (KPI Totals)")
         if not filtered_kpi.empty:
             chart_data = filtered_kpi[filtered_kpi["kpi_name"] == chosen_dashboard_kpi]
             if not chart_data.empty:
@@ -650,12 +561,12 @@ elif choice == "📈 Weekly Dashboard":
     with t1:
         if not filtered_att.empty:
             display_att_df = filtered_att.drop(columns=["verification_photo_blob"], errors="ignore")
-            st.dataframe(display_att_df, width=True)
+            st.dataframe(display_att_df, use_container_width=True)
             st.download_button("📥 Download Attendance & Timestamps CSV", display_att_df.to_csv(index=False).encode('utf-8'), f"attendance_and_time_logs_{start_week}_to_{today}.csv", "text/csv")
         else:
             st.dataframe(filtered_att)
     with t2:
-        st.dataframe(filtered_kpi, width=True)
+        st.dataframe(filtered_kpi, use_container_width=True)
         if not filtered_kpi.empty:
             st.download_button("📥 Download KPI Logs CSV", filtered_kpi.to_csv(index=False).encode('utf-8'), f"kpi_logs_{start_week}_to_{today}.csv", "text/csv")
 
