@@ -417,7 +417,7 @@ elif choice == "🎯 Setup & Log KPIs":
                         
                         default_val = 0.0
                         if not existing_logs.empty and emp_id in existing_logs["employee_id"].values:
-                            default_val = float(existing_logs[existing_logs["employee_id"] == emp_id]["value"].values)
+                            default_val = float(existing_logs[existing_logs["employee_id"] == emp_id]["value"].iloc[0]) if not existing_logs[existing_logs["employee_id"] == emp_id].empty else 0.0
                         
                         val = st.number_input(f"Value for {emp_name} ({emp_id})", min_value=0.0, value=default_val, step=1.0)
                         kpi_records.append({"date": date_str, "employee_id": emp_id, "name": emp_name, "kpi_name": selected_kpi, "value": val})
