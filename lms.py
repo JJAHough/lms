@@ -655,28 +655,28 @@ elif choice == "📈 Weekly Dashboard":
             st.markdown(f"##### 🏆 Performance Leaderboard Summary — {chosen_dashboard_kpi}")
             if not filtered_kpi.empty:
                 chart_data = filtered_kpi[filtered_kpi["kpi_name"] == chosen_dashboard_kpi]
-                    if not chart_data.empty:
-                        leaderboard = chart_data.groupby("name")
-                        ["value"].sum().sort_values(ascending=True)
-                        fig, ax = plt.subplots(figsize=(6, 4))
-                        fig.patch.set_facecolor('#FFFFFF')
-                        ax.set_facecolor('#F8FAFC')
+                if not chart_data.empty:
+                    leaderboard = chart_data.groupby("name")
+                    ["value"].sum().sort_values(ascending=True)
+                    fig, ax = plt.subplots(figsize=(6, 4))
+                    fig.patch.set_facecolor('#FFFFFF')
+                    ax.set_facecolor('#F8FAFC')
                         
-                        leaderboard.plot(kind='barh', color='#6366F1', ax=ax, width=0.5)
+                    leaderboard.plot(kind='barh', color='#6366F1', ax=ax, width=0.5)
                         
-                        ax.set_xlabel("Cumulative Metric Totals Logged", fontsize=10, color='#475569')
-                        ax.spines['top'].set_visible(False)
-                        ax.spines['right'].set_visible(False)
-                        ax.spines['left'].set_color('#CBD5E1')
-                        ax.spines['bottom'].set_color('#CBD5E1')
-                        ax.tick_params(colors='#475569', labelsize=9)
-                        plt.grid(axis='x', linestyle='--', alpha=0.3, color='#CBD5E1')
-                        st.pyplot(fig)
-                    else:
-                        st.info(f"No leaderboard activity values filed yet under '{chosen_dashboard_kpi}' within this window.")
-                    else:
-                        st.info("No operational KPI performance records entered yet.")
-                        st.markdown("", unsafe_allow_html=True)
+                    ax.set_xlabel("Cumulative Metric Totals Logged", fontsize=10, color='#475569')
+                    ax.spines['top'].set_visible(False)
+                    ax.spines['right'].set_visible(False)
+                    ax.spines['left'].set_color('#CBD5E1')
+                    ax.spines['bottom'].set_color('#CBD5E1')
+                    ax.tick_params(colors='#475569', labelsize=9)
+                    plt.grid(axis='x', linestyle='--', alpha=0.3, color='#CBD5E1')
+                    st.pyplot(fig)
+                else:
+                    st.info(f"No leaderboard activity values filed yet under '{chosen_dashboard_kpi}' within this window.")
+                else:
+                    st.info("No operational KPI performance records entered yet.")
+                    st.markdown("", unsafe_allow_html=True)
                         
     # 7. Auditable Data Ledger Grid Views Framework Block
     with st.container(border=True):
