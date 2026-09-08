@@ -657,7 +657,7 @@ elif choice == "📈 Weekly Dashboard":
                 chart_data = filtered_kpi[filtered_kpi["kpi_name"] == chosen_dashboard_kpi]
                 if not chart_data.empty:
                     leaderboard = chart_data.groupby("name")
-                    ["value"].sum().sort_values(ascending=True)
+                    sorted_chart_data = chart_data.groupby("employee_id")["value"].sum().sort_values(ascending=True)
                     fig, ax = plt.subplots(figsize=(6, 4))
                     fig.patch.set_facecolor('#FFFFFF')
                     ax.set_facecolor('#F8FAFC')
