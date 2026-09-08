@@ -100,8 +100,8 @@ def get_active_employees():
 # --------------------------------------------------------
 # 2. APP LAYOUT & NAVIGATION
 # --------------------------------------------------------
-st.set_page_config(page_title="Warehouse Labour Management System", layout="wide")
-st.title("🏭 Warehouse Labour Management System")
+st.set_page_config(page_title="Labour Management System", layout="wide")
+st.title("🏭 Labour Management System")
 st.caption("Labour Supply Company Portal for Warehouse Supervisors")
 
 menu = ["📈 Weekly Dashboard", "👥 Employee Management", "📝 Daily Attendance", "🎯 Setup & Log KPIs"]
