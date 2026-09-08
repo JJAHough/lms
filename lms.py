@@ -468,25 +468,37 @@ elif choice == "🎯 Setup & Log KPIs":
 # 6. MODULE: WEEKLY DASHBOARD
 # --------------------------------------------------------
 elif choice == "📈 Weekly Dashboard":
-    st.header("Weekly Operations Dashboard")
+    # 1. Dashboard Header Zone
+    st.markdown("## 📊 Executive Operations Dashboard")
+    st.caption("Real-time workforce deployment metrics, safety tracking, and labor fulfillment analytics.")
     
-    today = datetime.date.today()
-    start_week = st.date_input("Start Date for Dashboard View", today - datetime.timedelta(days=6))
-    
-    conn = get_db_connection()
-    settings_df = pd.read_sql("SELECT * FROM kpi_settings", conn)
-    kpi_logs_all = pd.read_sql("SELECT * FROM kpi_logs", conn)
-    attendance_all = pd.read_sql("SELECT * FROM attendance", conn)
-    conn.close()
-    
-    kpi_options = list(settings_df["kpi_name"].values) if not settings_df.empty else ["Boxes Packed"]
-    chosen_dashboard_kpi = st.selectbox("📊 Select KPI for Card & Chart Filtering", kpi_options, index=0)
-    
-    target_row = settings_df[settings_df["kpi_name"] == chosen_dashboard_kpi] if not settings_df.empty else pd.DataFrame()
-    weekly_target_threshold = float(target_row["target_value"].iloc[0]) if not target_row.empty else 50.0
-    
-    start_str, today_str = str(start_week), str(today)
-    
+    # 2. Insulated Control Panel Container
+    with st.container(border=True):
+        st.markdown("##### 🔍 Dashboard Filters & Configurations")
+        ctrl_col1, ctrl_col2 = st.columns(2)
+        
+        with ctrl_col1:
+            today = datetime.date.today()
+            start_week = st.date_input("Operational Window Start Date", today - datetime.timedelta(days=6))
+            start_str, today_str = str(start_week), str(today)
+            st.caption(f"📅 Selected Range: **{start_week}** to **{today}**")
+            
+        with ctrl_col2:
+            conn = get_db_connection()
+            settings_df = pd.read_sql("SELECT * FROM kpi_settings", conn)
+            kpi_logs_all = pd.read_sql("SELECT * FROM kpi_logs", conn)
+            attendance_all = pd.read_sql("SELECT * FROM attendance", conn)
+            conn.close()
+            
+            kpi_options = list(settings_df["kpi_name"].values) if not settings_df.empty else ["Boxes Packed"]
+            chosen_dashboard_kpi = st.selectbox("Select Operational KPI Filter Target", kpi_options, index=0)
+            
+            target_row = settings_df[settings_df["kpi_name"] == chosen_dashboard_kpi] if not settings_df.empty else pd.DataFrame()
+            weekly_target_threshold = float(target_row["target_value"].values) if not target_row.empty else 50.0
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # 3. Process backend computational logic pipelines cleanly
     if not attendance_all.empty:
         filtered_att = attendance_all[(attendance_all['date'] >= start_str) & (attendance_all['date'] <= today_str)]
     else:
@@ -501,7 +513,7 @@ elif choice == "📈 Weekly Dashboard":
     if not filtered_att.empty:
         for emp_id in filtered_att["employee_id"].unique():
             worker_week = filtered_att[filtered_att["employee_id"] == emp_id]
-            worker_name = worker_week["name"].iloc[0]
+            worker_name = worker_week["name"].iloc[0] if not worker_week.empty else "Unknown"
             
             has_lates = "Late" in worker_week["status"].values
             has_absents = "Absent" in worker_week["status"].values
@@ -511,91 +523,188 @@ elif choice == "📈 Weekly Dashboard":
             if not has_lates and not has_absents and not failed_ppe and not worker_week.empty:
                 bonus_workers.append(worker_name)
 
-    # --- KPI Dashboard Summary Overview Cards Row Grid ---
+    # 4. Stylized Executive Metric Cards Row Grid
     col1, col2, col3, col4, col5 = st.columns(5)
+    
+    # CSS Styles Template for Premium Cards Layout Architecture
+    card_base_css = (
+        "padding: 18px; border-radius: 10px; background-color: #FFFFFF; "
+        "box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: left; "
+        "min-height: 120px; display: flex; flex-direction: column; justify-content: center;"
+    )
+    
     with col1:
-        st.metric("Active Supply Staff", len(get_active_employees()))
+        st.markdown(f"""
+            <div style="{card_base_css} border-left: 5px solid #2E5BFF;">
+                <p style="margin: 0; font-size: 13px; color: #6C757D; font-weight: 600; text-transform: uppercase;">Active Roster</p>
+                <h2 style="margin: 6px 0 0 0; color: #1E293B; font-size: 34px; font-weight: 700;">{len(get_active_employees())}</h2>
+                <p style="margin: 2px 0 0 0; font-size: 11px; color: #2E5BFF; font-weight: 500;">Supplied Workers</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
     with col2:
         if not filtered_att.empty:
             presents = len(filtered_att[filtered_att["status"] == "Present"])
-            st.metric("Attendance Rate", f"{((presents / len(filtered_att)) * 100):.1f}%")
+            att_rate = (presents / len(filtered_att)) * 100
+            att_rate_str = f"{att_rate:.1f}%"
         else:
-            st.metric("Attendance Rate", "No Data")
+            att_rate_str = "N/A"
+        st.markdown(f"""
+            <div style="{card_base_css} border-left: 5px solid #00D28A;">
+                <p style="margin: 0; font-size: 13px; color: #6C757D; font-weight: 600; text-transform: uppercase;">Fulfillment Rate</p>
+                <h2 style="margin: 6px 0 0 0; color: #1E293B; font-size: 34px; font-weight: 700;">{att_rate_str}</h2>
+                <p style="margin: 2px 0 0 0; font-size: 11px; color: #00D28A; font-weight: 500;">On-Time Turnout</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
     with col3:
         if not filtered_att.empty:
             on_site = filtered_att[filtered_att["status"].isin(["Present", "Late"])]
             ppe_rate = (on_site["ppe_compliant"].sum() / len(on_site)) * 100 if not on_site.empty else 0.0
-            st.metric("PPE Safety Compliance", f"{ppe_rate:.1f}%")
+            ppe_str = f"{ppe_rate:.1f}%"
         else:
-            st.metric("PPE Safety Compliance", "No Data")
+            ppe_str = "N/A"
+        st.markdown(f"""
+            <div style="{card_base_css} border-left: 5px solid #FFC107;">
+                <p style="margin: 0; font-size: 13px; color: #6C757D; font-weight: 600; text-transform: uppercase;">PPE Adherence</p>
+                <h2 style="margin: 6px 0 0 0; color: #1E293B; font-size: 34px; font-weight: 700;">{ppe_str}</h2>
+                <p style="margin: 2px 0 0 0; font-size: 11px; color: #FFC107; font-weight: 500;">Safety Audit Pass</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
     with col4:
         if not filtered_kpi.empty:
             custom_data = filtered_kpi[filtered_kpi["kpi_name"] == chosen_dashboard_kpi]
             if not custom_data.empty:
                 calculated_avg = custom_data["value"].mean()
                 is_pct = "%" if "Punctuality" in chosen_dashboard_kpi or "Safety" in chosen_dashboard_kpi else ""
-                card_bg, text_color, status_symbol = ("#D4EDDA", "#155724", "✅ Pass") if calculated_avg >= weekly_target_threshold else ("#F8D7DA", "#721C24", "⚠️ Fail")
+                
+                card_bg, text_color, status_border = ("#D4EDDA", "#155724", "#28a745") if calculated_avg >= weekly_target_threshold else ("#F8D7DA", "#721C24", "#dc3545")
+                
                 st.markdown(f"""
-                    <div style="background-color: {card_bg}; padding: 6px; border-radius: 6px; border: 1px solid {text_color}; text-align: center;">
-                        <p style="margin: 0; font-size: 12px; color: {text_color}; font-weight: bold;">Avg {chosen_dashboard_kpi}</p>
-                        <h3 style="margin: 2px 0; color: {text_color}; font-size: 22px;">{calculated_avg:.1f}{is_pct}</h3>
-                        <p style="margin: 0; font-size: 10px; color: {text_color};">Target: {weekly_target_threshold:.1f}{is_pct} ({status_symbol})</p>
+                    <div style="padding: 14px; border-radius: 10px; background-color: {card_bg}; border-left: 5px solid {status_border}; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
+                        <p style="margin: 0; font-size: 12px; color: {text_color}; font-weight: 600; text-transform: uppercase;">Avg {chosen_dashboard_kpi}</p>
+                        <h2 style="margin: 4px 0 0 0; color: {text_color}; font-size: 30px; font-weight: 700;">{calculated_avg:.1f}{is_pct}</h2>
+                        <p style="margin: 2px 0 0 0; font-size: 10px; color: {text_color}; font-style: italic;">Target: {weekly_target_threshold:.1f}{is_pct}</p>
                     </div>
                 """, unsafe_allow_html=True)
             else:
-                st.metric(f"Avg {chosen_dashboard_kpi}", "0.0")
+                st.markdown(f"""
+                    <div style="{card_base_css} border-left: 5px solid #6C757D;">
+                        <p style="margin: 0; font-size: 12px; color: #6C757D; font-weight: 600; text-transform: uppercase;">Avg {chosen_dashboard_kpi}</p>
+                        <h2 style="margin: 6px 0 0 0; color: #1E293B; font-size: 34px; font-weight: 700;">0.0</h2>
+                        <p style="margin: 2px 0 0 0; font-size: 11px; color: #6C757D;">No Records Yet</p>
+                    </div>
+                """, unsafe_allow_html=True)
         else:
-            st.metric(f"Avg {chosen_dashboard_kpi}", "No Data")
+            st.markdown(f"""
+                <div style="{card_base_css} border-left: 5px solid #6C757D;">
+                    <p style="margin: 0; font-size: 12px; color: #6C757D; font-weight: 600; text-transform: uppercase;">Avg {chosen_dashboard_kpi}</p>
+                    <h2 style="margin: 6px 0 0 0; color: #1E293B; font-size: 34px; font-weight: 700;">---</h2>
+                    <p style="margin: 2px 0 0 0; font-size: 11px; color: #6C757D;">No Log Data Available</p>
+                </div>
+            """, unsafe_allow_html=True)
+            
     with col5:
-        st.metric("⭐ Bonus Qualifiers", len(bonus_workers))
+        st.markdown(f"""
+            <div style="{card_base_css} border-left: 5px solid #8B5CF6;">
+                <p style="margin: 0; font-size: 13px; color: #6C757D; font-weight: 600; text-transform: uppercase;">Incentive Qualifiers</p>
+                <h2 style="margin: 6px 0 0 0; color: #8B5CF6; font-size: 34px; font-weight: 700;">{len(bonus_workers)}</h2>
+                <p style="margin: 2px 0 0 0; font-size: 11px; color: #8B5CF6; font-weight: 500;">Perfect Week Tracking</p>
+            </div>
+        """, unsafe_allow_html=True)
 
+    # 5. Incentives and Recognition Alert Frame
     if bonus_workers:
-        st.success(f"🏅 **Weekly Bonus Recipients (100% Punctual & Safe):** {', '.join(bonus_workers)}")
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.success(f"🏅 **Perfect Attendance & Safety Compliance Bonus Recipients:** {', '.join(bonus_workers)}")
 
-    st.markdown("---")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- Charts Visualizations Graphing Grid Rows ---
+    # 6. Stylized Visual Charts Section Inside Custom Cards
     c1, c2 = st.columns(2)
+    
     with c1:
-        st.subheader("Attendance Breakdown")
-        if not filtered_att.empty:
-            status_counts = filtered_att["status"].value_counts()
-            fig, ax = plt.subplots(figsize=(5, 4))
-            status_counts.plot(kind='bar', color=['#4CAF50', '#F44336', '#FFC107', '#2196F3'], ax=ax)
-            ax.set_ylabel("Days Tracked")
-            plt.xticks(rotation=40)
-            st.pyplot(fig)
-        else:
-            st.info("No logs present for this date range scope.")
-    with c2:
-        st.subheader("Top Performers (KPI Totals)")
-        if not filtered_kpi.empty:
-            chart_data = filtered_kpi[filtered_kpi["kpi_name"] == chosen_dashboard_kpi]
-            if not chart_data.empty:
-                leaderboard = chart_data.groupby("name")["value"].sum().sort_values(ascending=False)
-                fig, ax = plt.subplots(figsize=(5, 4))
-                leaderboard.plot(kind='barh', color='#8884d8', ax=ax)
-                ax.set_xlabel("Cumulative Total")
+        with st.container(border=True):
+            st.markdown("##### 📈 Weekly Shift Attendance Composition")
+            if not filtered_att.empty:
+                status_counts = filtered_att["status"].value_counts()
+                
+                # Apply cohesive modern color scheme variables to plot chart layers
+                plot_colors = ['#10B981', '#EF4444', '#FBBF24', '#3B82F6'] # Present, Absent, Sick, Late
+                
+                fig, ax = plt.subplots(figsize=(6, 4))
+                fig.patch.set_facecolor('#FFFFFF')
+                ax.set_facecolor('#F8FAFC')
+                
+                status_counts.plot(kind='bar', color=plot_colors[:len(status_counts)], ax=ax, width=0.6)
+
+                ax.set_ylabel("Total Shift Records Tracked", fontsize=10, color='#475569')
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.spines['left'].set_color('#CBD5E1')
+                ax.spines['bottom'].set_color('#CBD5E1')
+                ax.tick_params(colors='#475569', labelsize=9)
+                plt.xticks(rotation=15)
+                plt.grid(axis='y', linestyle='--', alpha=0.3, color='#CBD5E1')
                 st.pyplot(fig)
             else:
-                st.info(f"No records mapped to metric '{chosen_dashboard_kpi}' within this window.")
-        else:
-            st.info("No KPI metric inputs saved yet.")
-            
-    st.markdown("---")
-    
-    # --- Detailed Ledger Grid Views & CSV Download Generators ---
-    st.subheader("Raw Activity Logs & Data Export")
-    t1, t2 = st.tabs(["Attendance & Scan Timestamps Records", "KPI Tracking Records"])
+                st.info("No attendance database information recorded within this operational date window range query.")
+    with c2:
+        with st.container(border=True):
+            st.markdown(f"##### 🏆 Performance Leaderboard Summary — {chosen_dashboard_kpi}")
+            if not filtered_kpi.empty:
+                chart_data = filtered_kpi[filtered_kpi["kpi_name"] == chosen_dashboard_kpi]
+                    if not chart_data.empty:
+                        leaderboard = chart_data.groupby("name")
+                        ["value"].sum().sort_values(ascending=True)
+                        fig, ax = plt.subplots(figsize=(6, 4))
+                        fig.patch.set_facecolor('#FFFFFF')
+                        ax.set_facecolor('#F8FAFC')
+                        
+                        leaderboard.plot(kind='barh', color='#6366F1', ax=ax, width=0.5)
+                        
+                        ax.set_xlabel("Cumulative Metric Totals Logged", fontsize=10, color='#475569')
+                        ax.spines['top'].set_visible(False)
+                        ax.spines['right'].set_visible(False)
+                        ax.spines['left'].set_color('#CBD5E1')
+                        ax.spines['bottom'].set_color('#CBD5E1')
+                        ax.tick_params(colors='#475569', labelsize=9)
+                        plt.grid(axis='x', linestyle='--', alpha=0.3, color='#CBD5E1')
+                        st.pyplot(fig)
+                    else:
+                        st.info(f"No leaderboard activity values filed yet under '{chosen_dashboard_kpi}' within this window.")
+                    else:
+                        st.info("No operational KPI performance records entered yet.")
+                        st.markdown("", unsafe_allow_html=True)
+                        
+    # 7. Auditable Data Ledger Grid Views Framework Block
+    with st.container(border=True):
+        st.markdown("##### 🗒️ Auditable Activity Logs & Data Export Engine")
+        t1, t2 = st.tabs(["🔒 Verified Roster Turnout Logs", "🎯 Logged Production KPIs Matrix"])
+        
     with t1:
         if not filtered_att.empty:
             display_att_df = filtered_att.drop(columns=["verification_photo_blob"], errors="ignore")
             st.dataframe(display_att_df, use_container_width=True)
-            st.download_button("📥 Download Attendance & Timestamps CSV", display_att_df.to_csv(index=False).encode('utf-8'), f"attendance_and_time_logs_{start_week}_to_{today}.csv", "text/csv")
+            st.download_button(
+                label="📥 Export Filtered Turnout Log Data (CSV)",
+                data=display_att_df.to_csv(index=False).encode('utf-8'),
+                file_name=f"turnout_audit_logs_{start_week}to{today}.csv",
+                mime="text/csv"
+                )
         else:
-            st.dataframe(filtered_att)
+            st.info("No turnout records mapped to the parameters specified.")
+            
     with t2:
-        st.dataframe(filtered_kpi, use_container_width=True)
         if not filtered_kpi.empty:
-            st.download_button("📥 Download KPI Logs CSV", filtered_kpi.to_csv(index=False).encode('utf-8'), f"kpi_logs_{start_week}_to_{today}.csv", "text/csv")
+            st.dataframe(filtered_kpi, use_container_width=True)
+            st.download_button(
+                label="📥 Export Logged Performance Data (CSV)",
+                data=filtered_kpi.to_csv(index=False).encode('utf-8'),
+                file_name=f"kpi_performance_matrix_{start_week}to{today}.csv",
+                mime="text/csv"
+                )
+        else:
+            st.info("No production KPIs recorded in this selected range timeframe yet.")
 
