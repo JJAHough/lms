@@ -20,7 +20,7 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Create Table 1: Employee Profiles
+    # Table 1: Employee Profiles
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS employees (
             employee_id TEXT PRIMARY KEY,
@@ -30,7 +30,7 @@ def init_db():
         )
     """)
     
-    # Create Table 2: Daily Attendance Logs
+    # Table 2: Daily Attendance Logs
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS attendance (
             date TEXT,
@@ -43,15 +43,16 @@ def init_db():
         )
     """)
     
-    # Create Table 3: KPI Target Configurations
+    # Table 3: KPI Target Configurations (UPDATED: Added applicable_roles column)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS kpi_settings (
             kpi_name TEXT PRIMARY KEY,
-            target_value REAL
+            target_value REAL,
+            applicable_roles TEXT
         )
     """)
     
-    # Create Table 4: Performance Value Logs
+    # Table 4: Performance Value Logs
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS kpi_logs (
             date TEXT,
@@ -62,7 +63,7 @@ def init_db():
         )
     """)
     
-    # Seed default baseline rows if database is completely new
+    # Seed default baseline rows if database is brand new
     cursor.execute("SELECT COUNT(*) FROM employees")
     if cursor.fetchone() == 0:
         default_workers = [
@@ -74,12 +75,14 @@ def init_db():
         
     cursor.execute("SELECT COUNT(*) FROM kpi_settings")
     if cursor.fetchone() == 0:
+        # Default global KPIs are assigned to ALL roles by default
+        all_roles_str = "Picker/Packer,Forklift Driver,Sorter,Loader/Unloader,Supervisor"
         default_targets = [
-            ("Boxes Packed", 50.0),
-            ("Safety Compliance Score", 98.0),
-            ("Attendance Punctuality", 95.0)
+            ("Boxes Packed", 50.0, "Picker/Packer"),
+            ("Safety Compliance Score", 98.0, all_roles_str),
+            ("Attendance Punctuality", 95.0, all_roles_str)
         ]
-        cursor.executemany("INSERT INTO kpi_settings VALUES (?, ?)", default_targets)
+        cursor.executemany("INSERT INTO kpi_settings VALUES (?, ?, ?)", default_targets)
         
     conn.commit()
     conn.close()
@@ -359,30 +362,37 @@ elif choice == "🎯 Setup & Log KPIs":
         col_new1, col_new2 = st.columns(2)
         with col_new1:
             new_kpi = st.text_input("Add New Metric Name (e.g., 'Pallets Moved')")
+            # NEW: Multiselect check inputs to map specific roles to this metric
+            chosen_roles = st.multiselect("Assign KPI to Applicable Warehouse Roles:", WAREHOUSE_ROLES, default=WAREHOUSE_ROLES)
         with col_new2:
             new_target = st.number_input("Set Target Value for This Metric", min_value=0.0, value=10.0, step=1.0)
             
         if st.button("Add Metric & Target") and new_kpi:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            try:
-                cursor.execute("INSERT INTO kpi_settings VALUES (?, ?)", (new_kpi, float(new_target)))
-                conn.commit()
-                st.success(f"Metric '{new_kpi}' added successfully!")
-            except sqlite3.IntegrityError:
-                st.error("Metric already exists.")
-            finally:
-                conn.close()
-                st.rerun()
+            if not chosen_roles:
+                st.error("Please assign this metric to at least one warehouse role classification.")
+            else:
+                roles_string = ",".join(chosen_roles)
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                try:
+                    cursor.execute("INSERT INTO kpi_settings VALUES (?, ?, ?)", (new_kpi, float(new_target), roles_string))
+                    conn.commit()
+                    st.success(f"Metric '{new_kpi}' successfully mapped to: {roles_string}!")
+                except sqlite3.IntegrityError:
+                    st.error("Metric already exists.")
+                finally:
+                    conn.close()
+                    st.rerun()
         
-        st.markdown("#### Current Target Configurations")
+        st.markdown("#### Current Target & Role Configurations")
         conn = get_db_connection()
         settings_df = pd.read_sql("SELECT * FROM kpi_settings", conn)
         conn.close()
         for idx, row in settings_df.iterrows():
             item = row["kpi_name"]
             is_auto = " (Automated)" if item in ["Attendance Punctuality", "Safety Compliance Score"] else ""
-            st.text(f"🎯 {item}{is_auto} — Target Average: {row['target_value']:.1f}")
+            roles_list = row["applicable_roles"] if "applicable_roles" in settings_df.columns else "All"
+            st.text(f"🎯 {item}{is_auto} \n   Target: {row['target_value']:.1f} | Roles: [{roles_list}]")
 
     with tab1:
         st.subheader("Capture Daily Worker Metrics")
@@ -405,35 +415,50 @@ elif choice == "🎯 Setup & Log KPIs":
             else:
                 selected_kpi = st.selectbox("Select Metric to Log", manual_kpi_options)
                 
+                # NEW: Query the database to find which roles are allowed to receive this specific KPI
+                kpi_info = settings_df[settings_df["kpi_name"] == selected_kpi]
+                allowed_roles_str = kpi_info["applicable_roles"].values[0] if not kpi_info.empty else ""
+                allowed_roles_list = allowed_roles_str.split(",")
+                
+                # NEW: Filter active workers dataframe list down to ONLY those matching the allowed role parameters
+                role_filtered_workers = active_workers[active_workers["Role"].isin(allowed_roles_list)]
+                
                 conn = get_db_connection()
                 existing_logs = pd.read_sql(f"SELECT * FROM kpi_logs WHERE date='{date_str}' AND kpi_name='{selected_kpi}'", conn)
                 conn.close()
                 
-                with st.form("kpi_form"):
-                    kpi_records = []
-                    for idx, row in active_workers.iterrows():
-                        emp_id = row["Employee ID"]
-                        emp_name = row["Name"]
+                if role_filtered_workers.empty:
+                    st.info(f"No active workers currently hold the roles required for this metric ({allowed_roles_str}).")
+                else:
+                    st.caption(f"Showing employees assigned to active target tracked roles: *{allowed_roles_str}*")
+                    with st.form("kpi_form"):
+                        kpi_records = []
+                        for idx, row in role_filtered_workers.iterrows():
+                            emp_id = row["Employee ID"]
+                            emp_name = row["Name"]
+                            emp_role = row["Role"]
+                            
+                            default_val = 0.0
+                            if not existing_logs.empty and emp_id in existing_logs["employee_id"].values:
+                                default_val = float(existing_logs[existing_logs["employee_id"] == emp_id]["value"].values)
+                            
+                            # Renders inputs dynamically matching target employee classifications
+                            val = st.number_input(f"Value for {emp_name} ({emp_id}) — {emp_role}", min_value=0.0, value=default_val, step=1.0)
+                            kpi_records.append({"date": date_str, "employee_id": emp_id, "name": emp_name, "kpi_name": selected_kpi, "value": val})
                         
-                        default_val = 0.0
-                        if not existing_logs.empty and emp_id in existing_logs["employee_id"].values:
-                            default_val = float(existing_logs[existing_logs["employee_id"] == emp_id]["value"].iloc[0]) if not existing_logs[existing_logs["employee_id"] == emp_id].empty else 0.0
+                        submit_kpi = st.form_submit_button("Save KPI Scores")
                         
-                        val = st.number_input(f"Value for {emp_name} ({emp_id})", min_value=0.0, value=default_val, step=1.0)
-                        kpi_records.append({"date": date_str, "employee_id": emp_id, "name": emp_name, "kpi_name": selected_kpi, "value": val})
-                    
-                    submit_kpi = st.form_submit_button("Save KPI Scores")
-                    
-                    if submit_kpi:
-                        conn = get_db_connection()
-                        cursor = conn.cursor()
-                        cursor.execute(f"DELETE FROM kpi_logs WHERE date='{date_str}' AND kpi_name='{selected_kpi}'")
-                        for rec in kpi_records:
-                            cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, ?, ?)", (rec["date"], rec["employee_id"], rec["name"], rec["kpi_name"], rec["value"]))
-                        conn.commit()
-                        conn.close()
-                        st.success("KPI Scores saved successfully!")
-                        st.rerun()
+                        if submit_kpi:
+                            conn = get_db_connection()
+                            cursor = conn.cursor()
+                            # Delete entries only for the role-filtered cohort to protect alternate entries matching database criteria
+                            for rec in kpi_records:
+                                cursor.execute(f"DELETE FROM kpi_logs WHERE date='{date_str}' AND kpi_name='{selected_kpi}' AND employee_id='{rec['employee_id']}'")
+                                cursor.execute("INSERT INTO kpi_logs VALUES (?, ?, ?, ?, ?)", (rec["date"], rec["employee_id"], rec["name"], rec["kpi_name"], rec["value"]))
+                            conn.commit()
+                            conn.close()
+                            st.success("KPI Scores saved successfully!")
+                            st.rerun()
 
 # --------------------------------------------------------
 # 6. MODULE: WEEKLY DASHBOARD
