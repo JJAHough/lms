@@ -388,24 +388,18 @@ elif choice == "📝 Daily Attendance":
 
                 for r in attendance_records:
                     conn = get_db_connection()
-                    
                     cursor = conn.cursor()
                     
-                    cursor.execute(f"""
-                        SELECT verification_photo_blob 
-                        FROM attendance 
-                        WHERE date='{date_str}'
-                    """)
-                    and
+                    # Combined into a single, targeted query
                     cursor.execute(f"""
                         SELECT verification_photo_blob 
                         FROM attendance 
                         WHERE date='{date_str}' AND employee_id='{r["employee_id"]}'
                     """)
                     res = cursor.fetchone()
-                    photo_to_save = res[0]
                     
-                    photo_to_save = res if (res and res[0]) else None
+                    # Safely extract the blob if a row was found
+                    photo_to_save = res[0] if (res and res[0] is not None) else None
                     
                 # 1. Execute the delete operation on its own line
                 cursor.execute(f"DELETE FROM attendance WHERE date = '{date_str}' AND employee_id='{r['employee_id']}'")
