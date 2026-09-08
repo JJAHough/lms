@@ -107,6 +107,9 @@ st.caption("Labour Supply Company Portal for Warehouse Supervisors")
 menu = ["📈 Weekly Dashboard", "👥 Employee Management", "📝 Daily Attendance", "🎯 Setup & Log KPIs"]
 choice = st.sidebar.selectbox("Navigation Menu", menu)
 
+# Global constant list of warehouse roles used for mapping consistency
+WAREHOUSE_ROLES = ["Picker/Packer", "Forklift Driver", "Sorter", "Loader/Unloader", "Supervisor"]
+
 # --------------------------------------------------------
 # 3. MODULE: EMPLOYEE MANAGEMENT
 # --------------------------------------------------------
