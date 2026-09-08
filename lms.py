@@ -68,7 +68,7 @@ def init_db():
     if cursor.fetchone() == 0:
         default_workers = [
             ("EMP001", "John Doe", "Forklift Driver", "Active"),
-            ("EMP002", "Jane Smith", "Picker/Packer", "Active"),
+            ("EMP002", "Jane Smith", "Picker", "Active"),
             ("EMP003", "Bob Johnson", "Sorter", "Active")
         ]
         cursor.executemany("INSERT INTO employees VALUES (?, ?, ?, 'Active')", default_workers)
@@ -76,9 +76,9 @@ def init_db():
     cursor.execute("SELECT COUNT(*) FROM kpi_settings")
     if cursor.fetchone() == 0:
         # Default global KPIs are assigned to ALL roles by default
-        all_roles_str = "Picker/Packer,Forklift Driver,Sorter,Loader/Unloader,Supervisor"
+        all_roles_str = "Picker,Packer,Forklift Driver,Sorter,Loader/Unloader,Supervisor"
         default_targets = [
-            ("Boxes Packed", 50.0, "Picker/Packer"),
+            ("Boxes Packed", 50.0, "Packer"),
             ("Safety Compliance Score", 98.0, all_roles_str),
             ("Attendance Punctuality", 95.0, all_roles_str)
         ]
@@ -123,7 +123,7 @@ if choice == "👥 Employee Management":
         with st.form("add_employee_form", clear_on_submit=True):
             new_id = st.text_input("Employee ID (e.g., EMP004)")
             new_name = st.text_input("Full Name")
-            new_role = st.selectbox("Warehouse Role", ["Picker/Packer", "Forklift Driver", "Sorter", "Loader/Unloader", "Supervisor"])
+            new_role = st.selectbox("Warehouse Role", ["Picker", "Packer", "Forklift Driver", "Sorter", "Loader/Unloader", "Supervisor"])
             submit_btn = st.form_submit_button("Save Employee")
             
             if submit_btn:
