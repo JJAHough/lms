@@ -494,7 +494,7 @@ elif choice == "📈 Weekly Dashboard":
             chosen_dashboard_kpi = st.selectbox("Select Operational KPI Filter Target", kpi_options, index=0)
             
             target_row = settings_df[settings_df["kpi_name"] == chosen_dashboard_kpi] if not settings_df.empty else pd.DataFrame()
-            weekly_target_threshold = float(target_row["target_value"].values) if not target_row.empty else 50.0
+            weekly_target_threshold = float(target_row["target_value"].iloc[0]) if not target_row.empty else 50.0
 
     st.markdown("<br>", unsafe_allow_html=True)
 
