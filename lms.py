@@ -674,9 +674,9 @@ elif choice == "📈 Weekly Dashboard":
                     st.pyplot(fig)
                 else:
                     st.info(f"No leaderboard activity values filed yet under '{chosen_dashboard_kpi}' within this window.")
-                else:
-                    st.info("No operational KPI performance records entered yet.")
-                    st.markdown("", unsafe_allow_html=True)
+            else:
+                st.info("No operational KPI performance records entered yet.")
+                st.markdown("", unsafe_allow_html=True)
                         
     # 7. Auditable Data Ledger Grid Views Framework Block
     with st.container(border=True):
