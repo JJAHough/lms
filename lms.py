@@ -396,7 +396,7 @@ elif choice == "📝 Daily Attendance":
                         FROM attendance 
                         WHERE date='{date_str}'
                     """)
-                    AND
+                    and
                     cursor.execute(f"""
                         SELECT verification_photo_blob 
                         FROM attendance 
