@@ -582,9 +582,9 @@ elif choice == "📈 Weekly Dashboard":
                 card_bg, text_color, status_border = ("#D4EDDA", "#155724", "#28a745") if calculated_avg >= weekly_target_threshold else ("#F8D7DA", "#721C24", "#dc3545")
                 
                 st.markdown(f"""
-                    <div style="padding: 14px; border-radius: 10px; background-color: {card_bg}; border-left: 5px solid {status_border}; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
-                        <p style="margin: 0; font-size: 12px; color: {text_color}; font-weight: 600; text-transform: uppercase;">Avg {chosen_dashboard_kpi}</p>
-                        <h2 style="margin: 4px 0 0 0; color: {text_color}; font-size: 30px; font-weight: 700;">{calculated_avg:.1f}{is_pct}</h2>
+                    <div style="padding: 18px; border-radius: 10px; background-color: {card_bg}; border-left: 5px solid {status_border}; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
+                        <p style="margin: 0; font-size: 13px; color: {text_color}; font-weight: 600; text-transform: uppercase;">Avg {chosen_dashboard_kpi}</p>
+                        <h2 style="margin: 6px 0 0 0; color: {text_color}; font-size: 34px; font-weight: 700;">{calculated_avg:.1f}{is_pct}</h2>
                         <p style="margin: 2px 0 0 0; font-size: 10px; color: {text_color}; font-style: italic;">Target: {weekly_target_threshold:.1f}{is_pct}</p>
                     </div>
                 """, unsafe_allow_html=True)
