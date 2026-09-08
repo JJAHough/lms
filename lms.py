@@ -650,12 +650,12 @@ elif choice == "📈 Weekly Dashboard":
     with t1:
         if not filtered_att.empty:
             display_att_df = filtered_att.drop(columns=["verification_photo_blob"], errors="ignore")
-            st.dataframe(display_att_df, use_container_width=True)
+            st.dataframe(display_att_df, width=True)
             st.download_button("📥 Download Attendance & Timestamps CSV", display_att_df.to_csv(index=False).encode('utf-8'), f"attendance_and_time_logs_{start_week}_to_{today}.csv", "text/csv")
         else:
             st.dataframe(filtered_att)
     with t2:
-        st.dataframe(filtered_kpi, use_container_width=True)
+        st.dataframe(filtered_kpi, width=True)
         if not filtered_kpi.empty:
             st.download_button("📥 Download KPI Logs CSV", filtered_kpi.to_csv(index=False).encode('utf-8'), f"kpi_logs_{start_week}_to_{today}.csv", "text/csv")
 
